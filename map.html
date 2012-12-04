@@ -11,42 +11,81 @@
             src="http://maps.googleapis.com/maps/api/js?key=AIzaSyDE1ewqASJyVejakp29K41cz-oQwlpL-n8&sensor=false">
         </script>
         <script type="text/javascript">
+
+            var paxEastLocation = new google.maps.LatLng(42.345715,-71.046047);
+            var paxPrimeLocation = new google.maps.LatLng(47.611716,-122.332823);
+            var paxAusLocation = new google.maps.LatLng(-37.781493,144.912618);
+
             function initialize() {
                 var mapOptions = {
-                    center: new google.maps.LatLng(38,-96),
-                    zoom: 5,
+                    center: paxEastLocation,
+                    zoom: 3,
                     mapTypeId: google.maps.MapTypeId.ROADMAP
                 };
                 var map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
-
                 var paxEastMarker = new google.maps.Marker({
-                    position: new google.maps.LatLng(42.345715,-71.046047),
+                    position: paxEastLocation,
                     map: map,
                     title: "PAX East"
                 });
                 var paxPrimeMarker = new google.maps.Marker({
-                    position: new google.maps.LatLng(47.611716,-122.332823),
+                    position: paxPrimeLocation,
                     map: map,
                     title: "PAX Prime"
                 });
-                var paxEastMarker = new google.maps.Marker({
-                    position: new google.maps.LatLng(-37.781493,144.912618),
+                var paxAusMarker = new google.maps.Marker({
+                    position: paxAusLocation,
                     map: map,
                     title: "PAX Australia"
                 });
 
-                var earthRadius = 6378.1; // Earth's radius in km.
+                var earthRadius = 6371009; // Earth's radius (m)
 
-                var maxDistance = 100; // Maximum side length of each polygon in kilometres.
+                var maxSideDistance = 100000; // Maximum side length (m).
+                var maxSideAngle = maxSideDistance / earthRadius; // Max. side angle.
                 var minPoints = 10; // Minimum number of points per polygon.
-                var step = 500; // Distance between adjacent contours in kilometres.
-                var maxDistance = Math.PI * earthRadius; // Farthest contour distance.
-                var numSteps = Math.floor(maxDistance / step);
-
+                var step = 500000; // Max distance between contours (m).
+                var stepAngle = step / earthRadius; // Step distance (central angle)
+                var numSteps = Math.floor(Math.PI / stepAngle);
                 for (var i = 1; i <= numSteps; i++) {
-                    var distance = i * step; // distance for the current contour.
-                    for (var j = 0; j <= numPoints; j++) {
-                }
+                    var centralAngle = i * stepAngle; // distance for the current contour.
+                    var center = paxEastLocation;
+                    if (centralAngle > Math.PI / 2) {
+                        centralAngle = Math.PI - centralAngle;
+                        center = new google.maps.LatLng(-center.lat(), 180 + center.lng());
+                    }
+
+                    var radius = Math.floor(centralAngle * earthRadius);
+                    var circle = new google.maps.Circle({
+                        center: center,
+                        radius: radius,
+                        map: map,
+                        strokeColor: "#FF0000",
+                        strokeOpacity: 0.8,
+                        strokeWeight: 2,
+                        fillColor: "#000000",
+                        fillOpacity: 0
+                    });
+                    var circumferenceAngle = 2 * Math.PI * Math.sin(centralAngle);
+                    var numPoints = Math.ceil(circumferenceAngle / maxSideAngle);
+                    if (numPoints < minPoints) {
+                        numPoints = minPoints;
+                    }
+                    /*
+                    var path = new Array();
+                    for (var j = 0; j < numPoints; j++) {
+                    path[j] = 
+                    }
+                    path[numPoints] = path[0];
+                    var contour = new google.maps.Polygon({
+                    paths: path,
+                    strokeColor: "#FF0000",
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                    fillColor: "#FF0000",
+                    fillOpacity: 0.35
+                    });
+                    */
                 }
             }
         </script>
