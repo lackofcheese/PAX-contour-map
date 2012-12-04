@@ -11,56 +11,92 @@
             src="http://maps.googleapis.com/maps/api/js?key=AIzaSyDE1ewqASJyVejakp29K41cz-oQwlpL-n8&sensor=false">
         </script>
         <script type="text/javascript">
+            // Map locations.
+            var locations = [
+                ["PAX East", new google.maps.LatLng(42.345715,-71.046047)],
+                ["PAX Prime", new google.maps.LatLng(47.611716,-122.332823)],
+                ["PAX Australia", new google.maps.LatLng(-37.781493,144.912618)],
+            ];
 
-            var paxEastLocation = new google.maps.LatLng(42.345715,-71.046047);
-            var paxPrimeLocation = new google.maps.LatLng(47.611716,-122.332823);
-            var paxAusLocation = new google.maps.LatLng(-37.781493,144.912618);
+            // Contour map settings.
+            var earthRadius = 6371009; // Earth's radius (m)
+            var maxSideDistance = 100000; // Maximum side length (m).
+            var maxSideAngle = maxSideDistance / earthRadius; // Max. side angle.
+            var minPoints = 10; // Minimum number of points per polygon.
+            var step = 500 * 1000; // Max distance between contours (m).
+            var stepAngle = step / earthRadius; // Step distance (central angle)
+            var numSteps = Math.floor(Math.PI / stepAngle);
+
+            // Color functionality.
+            function interpolateColors(color1, color2, a) {
+                return [
+                    Math.floor(a * color2[0] + (1-a) * color1[0]),
+                    Math.floor(a * color2[1] + (1-a) * color1[1]),
+                    Math.floor(a * color2[2] + (1-a) * color1[2]),
+                ];
+            }
+
+            function colorToString(color) {
+                return "rgb(" + color[0] + ", " + color[1] + ", " + color[2] + ")";
+            }
+
+            function ColorMap(colors) {
+                this.colors = colors;
+                this.multiplier = colors.length - 1;
+            }
+
+            ColorMap.prototype.getColor = function(value) {
+                var index = this.multiplier * value;
+                var i = Math.floor(index);
+                if (i > this.colors.length - 2) {
+                    i = this.colors.length - 2
+                }
+                var a = index - i;
+                if (a < 0) {
+                    a = 0;
+                } else if (a > 1) {
+                    a = 1;
+                }
+                return colorToString(
+                    interpolateColors(this.colors[i], this.colors[i+1], a));
+            };
+
+            var defaultColorMap = new ColorMap([
+                [0,0,255],
+                [0,255,255],
+                [255,255,0],
+                [255,127,0],
+                [255,0,0],
+            ]);
+
 
             function initialize() {
                 var mapOptions = {
-                    center: paxEastLocation,
+                    center: locations[0][1],
                     zoom: 3,
                     mapTypeId: google.maps.MapTypeId.ROADMAP
                 };
                 var map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
-                var paxEastMarker = new google.maps.Marker({
-                    position: paxEastLocation,
-                    map: map,
-                    title: "PAX East"
-                });
-                var paxPrimeMarker = new google.maps.Marker({
-                    position: paxPrimeLocation,
-                    map: map,
-                    title: "PAX Prime"
-                });
-                var paxAusMarker = new google.maps.Marker({
-                    position: paxAusLocation,
-                    map: map,
-                    title: "PAX Australia"
-                });
-
-                var earthRadius = 6371009; // Earth's radius (m)
-
-                var maxSideDistance = 100000; // Maximum side length (m).
-                var maxSideAngle = maxSideDistance / earthRadius; // Max. side angle.
-                var minPoints = 10; // Minimum number of points per polygon.
-                var step = 500000; // Max distance between contours (m).
-                var stepAngle = step / earthRadius; // Step distance (central angle)
-                var numSteps = Math.floor(Math.PI / stepAngle);
+                for (var i = 0; i < locations.length; i++) {
+                    var marker = new google.maps.Marker({
+                        position: locations[i][1],
+                        map: map,
+                        title: locations[i][0]
+                    });
+                }
                 for (var i = 1; i <= numSteps; i++) {
                     var centralAngle = i * stepAngle; // distance for the current contour.
-                    var center = paxEastLocation;
+                    var center = locations[0][1];
                     if (centralAngle > Math.PI / 2) {
                         centralAngle = Math.PI - centralAngle;
                         center = new google.maps.LatLng(-center.lat(), 180 + center.lng());
                     }
-
                     var radius = Math.floor(centralAngle * earthRadius);
                     var circle = new google.maps.Circle({
                         center: center,
                         radius: radius,
                         map: map,
-                        strokeColor: "#FF0000",
+                        strokeColor: defaultColorMap.getColor((i-1)/(numSteps-1)),
                         strokeOpacity: 0.8,
                         strokeWeight: 2,
                         fillColor: "#000000",
