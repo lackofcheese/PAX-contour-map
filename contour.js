@@ -133,6 +133,7 @@ function createMarker(position, title) {
 
 
 function initialize() {
+    alert(document.URL);
     colorMap = new ColorMap(COLORS);
     stepAngle = STEP / EARTH_RADIUS;
     maxSideAngle = RESOLUTION / EARTH_RADIUS;
