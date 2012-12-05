@@ -8,10 +8,10 @@
             #map_canvas { height: 100% }
         </style>
         <script type="text/javascript"
-            src="http://maps.googleapis.com/maps/api/js?libraries=geometry&sensor=false&?key=AIzaSyDE1ewqASJyVejakp29K41cz-oQwlpL-n8">
+            src="http://maps.googleapis.com/maps/api/js?sensor=false&?key=AIzaSyDE1ewqASJyVejakp29K41cz-oQwlpL-n8">
         </script>
         <script src="sylvester.js"></script>
-        <script type="text/javascript" src="arcset.js"></script>
+        <script type="text/javascript" src="intersection.js"></script>
         <script type="text/javascript" src="contour.js"></script>
         <script type="text/javascript">
             // Map locations.
@@ -23,11 +23,8 @@
 
             // Contour map settings.
             var EARTH_RADIUS = 6371009; // Earth's radius (m)
-            var RESOLUTION = 10 * 1000; // Resolution (m)
-            var MAX_SIDE_ANGLE = RESOLUTION / EARTH_RADIUS; // Max. side angle.
-            var STEP = 500 * 1000; // distance between contours (m).
-            var STEP_ANGLE = STEP / EARTH_RADIUS; // Step distance (as a central angle)
-            var NUM_CONTOURS = Math.ceil(Math.PI / STEP_ANGLE) + 1;
+            var RESOLUTION = 100 * 1000; // Resolution (m)
+            var STEP = 200 * 1000; // distance between contours (m).
             var MAP_OPTIONS = {
                 center: LOCATIONS[0][1],
                 zoom: 3,
