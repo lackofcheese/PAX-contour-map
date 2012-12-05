@@ -151,16 +151,12 @@ function drawContours() {
                     intersections[i][j] = intersections[j][i] = vecs;
                     intersectionAngles[i][j] = [];
                     intersectionAngles[j][i] = [];
-                    var i0 = i;
-                    var j0 = j;
-                    for (var k = 0; k < 2; k++) {
+                    for (var ii = i, jj = j, k = 0; k < 2; ii = j, jj = i, k++) {
                         for (var m = 0; m < 2; m++) {
-                            var x = vecs[m].dot(coordVecs[i0][0]);
-                            var y = vecs[m].dot(coordVecs[i0][1]);
-                            intersectionAngles[i0][j0][m] = Math.atan2(y, x);
+                            var x = vecs[m].dot(coordVecs[ii][0]);
+                            var y = vecs[m].dot(coordVecs[ii][1]);
+                            intersectionAngles[ii][jj][m] = Math.atan2(y, x);
                         }
-                        i0 = j;
-                        j0 = i;
                     }
                 }
             }
