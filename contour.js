@@ -1,20 +1,36 @@
-// Map locations.
-var locations = [
-    ["PAX East", new google.maps.LatLng(42.345715,-71.046047)],
-    ["PAX Prime", new google.maps.LatLng(47.611716,-122.332823)],
-    ["PAX Australia", new google.maps.LatLng(-37.781493,144.912618)],
-];
+// Coordinate manipulations
+function findPerpendicularVectors(vector) {
+    var v1, v2;
+    if (vector.e(1) == 0 && vector.e(2) == 0) {
+        v1 = $V([1, 0, 0]);
+        v2 = $V([0, 1, 0]);
+    } else {
+        v1 = $V([-vector.e(2), vector.e(1), 0]);
+        v1 = v1.toUnitVector();
+        v2 = vector.cross(v1);
+    }
+    return [v1, v2];
+}
 
-var distances = []
+function VectorToLatLng(myVector) {
+    var elevation = Math.asin(myVector.e(3));
+    var azimuth = Math.atan2(myVector.e(2), myVector.e(1));
+    return new google.maps.LatLng(
+        elevation * 180 / Math.PI,
+        azimuth * 180 / Math.PI
+    ); 
+}
 
-// Contour map settings.
-var earthRadius = 6371009; // Earth's radius (m)
-var maxSideDistance = 10 * 1000; // Maximum side length (m).
-var maxSideAngle = maxSideDistance / earthRadius; // Max. side angle.
-var minPoints = 20; // Minimum number of points per polygon.
-var step = 500 * 1000; // Max distance between contours (m).
-var stepAngle = step / earthRadius; // Step distance (central angle)
-var numSteps = Math.floor(Math.PI / stepAngle);
+function LatLngToVector(myLatLng) {
+    var elevation = Math.PI * myLatLng.lat() / 180;
+    var azimuth = Math.PI * myLatLng.lng() / 180;
+    var temp = Math.cos(elevation);
+    return $V([
+        temp * Math.cos(azimuth),
+        temp * Math.sin(azimuth),
+        Math.sin(elevation),
+    ]);
+}
 
 // Color functionality.
 function interpolateColors(color1, color2, a) {
@@ -36,95 +52,182 @@ function ColorMap(colors) {
 
 ColorMap.prototype.getColor = function(value) {
     var index = this.multiplier * value;
-    var i = Math.floor(index);
-    if (i > this.colors.length - 2) {
-        i = this.colors.length - 2
-    }
-    var a = index - i;
-    if (a < 0) {
-        a = 0;
-    } else if (a > 1) {
-        a = 1;
-    }
+    var i = Math.min(this.colors.length-2, Math.floor(index));
+    var a = Math.min(1, Math.max(0, index - i));
     return colorToString(
         interpolateColors(this.colors[i], this.colors[i+1], a));
 };
 
-var defaultColorMap = new ColorMap([
-    [0,0,255],
-    [0,255,255],
-    [255,255,0],
-    [255,127,0],
-    [255,0,0],
-]);
+function normalizeAngle(angle) {
+    return angle - 2*Math.PI*Math.floor(angle/(2*Math.PI));
+}
 
+
+// Global variables.
+var colorMap; // The color map for drawing.
+var map; // The map object.
 
 function initialize() {
-    var mapOptions = {
-        center: locations[0][1],
-        zoom: 3,
-        mapTypeId: google.maps.MapTypeId.ROADMAP
-    };
-    var map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
-    for (var i = 0; i < locations.length; i++) {
+    colorMap = new ColorMap(COLORS);
+    // The actual Google Maps map object.
+    map = new google.maps.Map(
+        document.getElementById("map_canvas"),
+        MAP_OPTIONS
+    );
+    for (var i = 0; i < LOCATIONS.length; i++) {
         var marker = new google.maps.Marker({
-            position: locations[i][1],
+            position: LOCATIONS[i][1],
             map: map,
-            title: locations[i][0]
+            title: LOCATIONS[i][0]
         });
     }
+    drawContours();
+}
 
-    var center = mapOptions.center;
-    var elevation = Math.PI * center.lat() / 180;
-    var azimuth = Math.PI * center.lng() / 180;
-    var temp = Math.cos(elevation);
-    var centerVector = $V([
-        temp * Math.cos(azimuth),
-        temp * Math.sin(azimuth),
-        Math.sin(elevation),
-    ]);
+function drawContours() {
+    // Extra coordinate variables.
+    var positions = [];
+    var halfAngles = [];
+    var tangents = [];
+    var normals = [];
+    var binormals = [];
+    var coordVecs = [];
+    for (var i = 0; i < LOCATIONS.length; i++) {
+        positions[i] = LatLngToVector(LOCATIONS[i][1]);
+    }
+    for (var i = 0; i < LOCATIONS.length; i++) {
+        halfAngles[i] = [];
+        tangents[i] = [];
+        normals[i] = [];
+        binormals[i] = [];
+        for (var j = 0; j < i; j++) {
+            halfAngles[i][j] = halfAngles[j][i] = positions[i].angleFrom(positions[j]) / 2;
+            var normal = positions[i].add(positions[j]).toUnitVector();
+            var tangent = positions[i].subtract(positions[j]).toUnitVector();
+            var binormal = tangent.cross(normal);
+            normals[i][j] = normals[j][i] = normal;
+            tangents[i][j] = tangents[j][i] = tangent;
+            binormals[i][j] = binormals[j][i] = binormal;
+        }
+    }
+    if (LOCATIONS.length == 1) {
+        coordVecs[0] = findPerpendicularVectors(positions[0]);
+    } else {
+        for (var i = 0; i < LOCATIONS.length; i++) {
+            var v1 = binormals[i][(i+1)%LOCATIONS.length];
+            var v2 = positions[i].cross(v1);
+            coordVecs[i] = [v1, v2];
+        }
+    }
 
-    for (var i = 1; i <= numSteps; i++) {
-        var centralAngle = i * stepAngle; // distance for the current contour.
-        var vector = centerVector;
-        if (centralAngle > Math.PI / 2) {
-            centralAngle = Math.PI - centralAngle;
-            vector = centerVector.multiply(-1);
-        }
-        var v1, v2;
-        if (vector.e(1) == 0 && vector.e(2) == 0) {
-            v1 = $V([1, 0, 0]);
-            v2 = $V([0, 1, 0]);
-        } else {
-            v1 = $V([-vector.e(2), vector.e(1), 0]);
-            v1 = v1.multiply(1 / v1.modulus());
-            v2 = vector.cross(v1);
-        }
-        vector = vector.multiply(Math.cos(centralAngle));
+    // Start drawing the contours.
+    var found = false;
+    for (var step = 1; step <= NUM_CONTOURS; step++) {
+        var centralAngle = step * STEP_ANGLE; // distance for the current contour.
 
-        var circumferenceAngle = 2 * Math.PI * Math.sin(centralAngle);
-        var numPoints = Math.ceil(circumferenceAngle / maxSideAngle);
-        if (numPoints < minPoints) {
-            numPoints = minPoints;
+        // Find the intersections between the individual circles.
+        var intersections = [];
+        var intersectionAngles = [];
+        var arcSets = [];
+        for (var i = 0; i < positions.length; i++) {
+            intersections[i] = [];
+            intersectionAngles[i] = [];
+        }
+        for (var i = 0; i < positions.length; i++) {
+            intersections[i][i] = null;
+            for (var j = 0; j < i; j++) {
+                if (centralAngle <= halfAngles[i][j]) {
+                    intersections[i][j] = intersections[j][i] = null;
+                } else {
+                    var angularDelta = Math.acos(Math.cos(centralAngle) / Math.cos(halfAngles[i][j]));
+                    var a = normals[i][j].multiply(Math.cos(angularDelta));
+                    var b = binormals[i][j].multiply(Math.sin(angularDelta));
+                    var vecs = [a.add(b), a.subtract(b)];
+                    intersections[i][j] = intersections[j][i] = vecs;
+
+                    intersectionAngles[i][j] = [];
+                    intersectionAngles[j][i] = [];
+                    var i0 = i;
+                    var j0 = j;
+                    for (var k = 0; k < 2; k++) {
+                        for (var m = 0; m < 2; m++) {
+                            var x = vecs[m].dot(coordVecs[i0][0]);
+                            var y = vecs[m].dot(coordVecs[i0][1]);
+                            intersectionAngles[i0][j0][m] = Math.atan2(y, x);
+                        }
+                        i0 = j;
+                        j0 = i;
+                    }
+                }
+            }
         }
 
-        var path = new Array();
-        for (var j = 0; j < numPoints; j++) {
-            var angle = 2 * Math.PI * j / numPoints;
-            var offset = v1.multiply(Math.sin(angle)).add(v2.multiply(Math.cos(angle)));
-            var newVector = vector.add(offset.multiply(Math.sin(centralAngle)));
-            var elevation = Math.asin(newVector.e(3));
-            var azimuth = Math.atan2(newVector.e(2), newVector.e(1));
-            path[j] = new google.maps.LatLng(
-                elevation * 180 / Math.PI,
-                azimuth * 180 / Math.PI
-            );
+        var mappings = {}
+        for (var i = 0; i < positions.length; i++) {
+            var arcSet = new ArcSet(); 
+            for (var j = 0; j < positions.length; j++) {
+                if (intersections[i][j] == null) {
+                    continue;
+                }
+                var angles = intersectionAngles[i][j];
+                var a = 0; 
+                var b = 1;
+                if (angles[a] > angles[b]) {
+                    a = 1-a;
+                    b = 1-b;
+                }
+                if ((angles[b] - angles[a]) > Math.PI) {
+                    a = 1-a;
+                    b = 1-b;
+                }
+                arcSet.combine(angles[a], j, angles[b], j);
+            }
+            arcSet = arcSet.getInverse();
+            for (var arcNo = 0; arcNo < arcSet.arcs.length; arcNo++) {
+                var arc = arcSet.arcs[arcNo];
+                start = arc[0];
+                prevArc = arc[1];
+                end = arc[2];
+                nextArc = arc[3]
+                mappings[[i, prevArc]] = [start, end, nextArc]; 
+            }
         }
-        path[numPoints] = path[0];
+        
+        var paths = [];
+        var keys = Object.keys(mappings);
+        for (var pathNo = 0; keys.length > 0; pathNo++, keys = Object.keys(mappings)) {
+            paths[pathNo] = [];
+            var key = keys[0];
+            var nextNum = eval('[' + key + ']')[0];
+            for (var pathPos = 0; nextNum != null && key in mappings;) {
+                var currentNum = nextNum;
+                var pathParams = mappings[key];
+                var start = pathParams[0];
+                var end = pathParams[1];
+                nextNum = pathParams[2];
+                delete mappings[key];
+                var key = [nextNum, currentNum];
+
+                var centerVector = positions[currentNum].multiply(Math.cos(centralAngle));
+                var v0 = coordVecs[currentNum][0];
+                var v1 = coordVecs[currentNum][1];
+                var arcAngle = end - start;
+                if (arcAngle < 0) {
+                    arcAngle += 2 * Math.PI;
+                }
+                var numSteps = Math.ceil(arcAngle * Math.sin(centralAngle) / MAX_SIDE_ANGLE);
+                for (var i = 0; i <= numSteps; i++) {
+                    var angle = (end * i + start * (numSteps-i)) / numSteps;
+                    var offset = v0.multiply(Math.cos(angle)).add(v1.multiply(Math.sin(angle)));
+                    paths[pathNo][pathPos] = VectorToLatLng(centerVector.add(offset.multiply(Math.sin(centralAngle))));
+                    pathPos++;
+                }
+            }
+        }
         var contour = new google.maps.Polygon({
-            paths: path,
+            paths: paths,
             map: map,
-            strokeColor: defaultColorMap.getColor((i-1)/(numSteps-1)),
+            strokeColor: colorMap.getColor((step-1)/(NUM_CONTOURS-1)),
             strokeOpacity: 0.8,
             strokeWeight: 2,
             fillColor: "#FF0000",

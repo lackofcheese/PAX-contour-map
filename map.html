@@ -8,10 +8,40 @@
             #map_canvas { height: 100% }
         </style>
         <script type="text/javascript"
-            src="http://maps.googleapis.com/maps/api/js?key=AIzaSyDE1ewqASJyVejakp29K41cz-oQwlpL-n8&sensor=false">
+            src="http://maps.googleapis.com/maps/api/js?libraries=geometry&sensor=false&?key=AIzaSyDE1ewqASJyVejakp29K41cz-oQwlpL-n8">
         </script>
         <script src="sylvester.js"></script>
+        <script type="text/javascript" src="arcset.js"></script>
         <script type="text/javascript" src="contour.js"></script>
+        <script type="text/javascript">
+            // Map locations.
+            var LOCATIONS = [
+                ["PAX Prime", new google.maps.LatLng(47.611716,-122.332823)],
+                ["PAX East", new google.maps.LatLng(42.345715,-71.046047)],
+                ["PAX Australia", new google.maps.LatLng(-37.781493,144.912618)],
+            ];
+
+            // Contour map settings.
+            var EARTH_RADIUS = 6371009; // Earth's radius (m)
+            var RESOLUTION = 50 * 1000; // Resolution (m)
+            var MAX_SIDE_ANGLE = RESOLUTION / EARTH_RADIUS; // Max. side angle.
+            var STEP = 400 * 1000; // distance between contours (m).
+            var STEP_ANGLE = STEP / EARTH_RADIUS; // Step distance (as a central angle)
+            var NUM_CONTOURS = 25; //Math.floor(Math.PI / STEP_ANGLE);
+            var MAP_OPTIONS = {
+                center: LOCATIONS[0][1],
+                zoom: 3,
+                mapTypeId: google.maps.MapTypeId.ROADMAP
+            };
+            var COLORS = [
+                [0,0,255],
+                [0,255,255],
+                [255,255,0],
+                [255,127,0],
+                [255,0,0],
+            ];
+
+        </script>
     </head>
     <body onload="initialize()">
         <div id="map_canvas" style="width:100%; height:100%"></div>
