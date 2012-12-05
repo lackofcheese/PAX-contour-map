@@ -178,6 +178,9 @@ function drawContours() {
     normals = [];
     binormals = [];
     coordVecs = [];
+    if (markers.length == 0) {
+        return;
+    }
     for (var i = 0; i < markers.length; i++) {
         positions[i] = LatLngToVector(markers[i].getPosition());
     }
@@ -209,8 +212,12 @@ function drawContours() {
     // Start drawing the contours.
     var finished = false;
     var allContours = [];
-    for (var step = 0;; step++) {
-        centralAngle = step * stepAngle; // distance for the current contour.
+    for (var count = 0;; count++) {
+        centralAngle = count * stepAngle; // distance for the current contour.
+        if (centralAngle > Math.PI) {
+            finished = true;
+            break;
+        }
 
         // Find the intersections between the individual circles.
         var intersectionsByIndex = [];
@@ -328,11 +335,11 @@ function drawContours() {
         }
         allContours.push(currentContour);
     }
-    for (i = 0; i < step; i++) {
+    for (i = 0; i < count; i++) {
         contourPolys.push(new google.maps.Polygon({
             paths: allContours[i],
             map: map,
-            strokeColor: colorMap.getColor(i / (step - 1)),
+            strokeColor: colorMap.getColor(i / (count - 1)),
             strokeOpacity: 0.8,
             strokeWeight: 2,
             fillOpacity: 0,
