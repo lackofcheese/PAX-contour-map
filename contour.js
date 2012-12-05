@@ -121,14 +121,15 @@ function drawContours() {
     }
 
     // Start drawing the contours.
-    var found = false;
-    for (var step = 1; step <= NUM_CONTOURS; step++) {
-        var centralAngle = step * STEP_ANGLE; // distance for the current contour.
+    var finished = false;
+    var allPaths = [];
+    for (var step = 0; step < NUM_CONTOURS; step++) {
+        allPaths[step] = [];
+        var centralAngle = (step + 1) * STEP_ANGLE; // distance for the current contour.
 
         // Find the intersections between the individual circles.
         var intersections = [];
         var intersectionAngles = [];
-        var arcSets = [];
         for (var i = 0; i < positions.length; i++) {
             intersections[i] = [];
             intersectionAngles[i] = [];
@@ -138,13 +139,16 @@ function drawContours() {
             for (var j = 0; j < i; j++) {
                 if (centralAngle <= halfAngles[i][j]) {
                     intersections[i][j] = intersections[j][i] = null;
+                } else if (centralAngle >= Math.PI - halfAngles[i][j]) {
+                    intersections[i][j] = intersections[j][i] = null;
+                    finished = true;
+                    break;
                 } else {
                     var angularDelta = Math.acos(Math.cos(centralAngle) / Math.cos(halfAngles[i][j]));
                     var a = normals[i][j].multiply(Math.cos(angularDelta));
                     var b = binormals[i][j].multiply(Math.sin(angularDelta));
                     var vecs = [a.add(b), a.subtract(b)];
                     intersections[i][j] = intersections[j][i] = vecs;
-
                     intersectionAngles[i][j] = [];
                     intersectionAngles[j][i] = [];
                     var i0 = i;
@@ -160,6 +164,12 @@ function drawContours() {
                     }
                 }
             }
+            if (finished) {
+                break;
+            }
+        }
+        if (finished) {
+            break;
         }
 
         var mappings = {}
@@ -182,7 +192,9 @@ function drawContours() {
                 }
                 arcSet.combine(angles[a], j, angles[b], j);
             }
-            arcSet = arcSet.getInverse();
+            if (centralAngle < Math.PI / 2) {
+                arcSet = arcSet.getInverse();
+            }
             for (var arcNo = 0; arcNo < arcSet.arcs.length; arcNo++) {
                 var arc = arcSet.arcs[arcNo];
                 start = arc[0];
@@ -193,10 +205,9 @@ function drawContours() {
             }
         }
         
-        var paths = [];
         var keys = Object.keys(mappings);
         for (var pathNo = 0; keys.length > 0; pathNo++, keys = Object.keys(mappings)) {
-            paths[pathNo] = [];
+            allPaths[step][pathNo] = [];
             var key = keys[0];
             var nextNum = eval('[' + key + ']')[0];
             for (var pathPos = 0; nextNum != null && key in mappings;) {
@@ -219,18 +230,19 @@ function drawContours() {
                 for (var i = 0; i <= numSteps; i++) {
                     var angle = (end * i + start * (numSteps-i)) / numSteps;
                     var offset = v0.multiply(Math.cos(angle)).add(v1.multiply(Math.sin(angle)));
-                    paths[pathNo][pathPos] = VectorToLatLng(centerVector.add(offset.multiply(Math.sin(centralAngle))));
+                    allPaths[step][pathNo][pathPos] = VectorToLatLng(centerVector.add(offset.multiply(Math.sin(centralAngle))));
                     pathPos++;
                 }
             }
         }
+    }
+    for (i = 0; i < step; i++) {
         var contour = new google.maps.Polygon({
-            paths: paths,
+            paths: allPaths[i],
             map: map,
-            strokeColor: colorMap.getColor((step-1)/(NUM_CONTOURS-1)),
+            strokeColor: colorMap.getColor(i / (step - 1)),
             strokeOpacity: 0.8,
             strokeWeight: 2,
-            fillColor: "#FF0000",
             fillOpacity: 0
         });
     }
