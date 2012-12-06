@@ -1,3 +1,5 @@
+var baseURL;
+
 var markers;
 var droppedMarker = null;
 
@@ -50,7 +52,7 @@ function get_locations(query) {
 }
 
 function makeURL() {
-    var newURL = window.location.href.replace(window.location.search, "");
+    var newURL = baseURL;
     var first = true;
     for (var i = 0; i < markers.length; i++) {
         if (first) {
@@ -198,11 +200,19 @@ function createMarker(position, title) {
 
 function initialize() {
     var locations;
-    query = window.location.search;
-    if (query == '') {
+    var splitURL = window.location.href.split('?', 2);
+    var query;
+    if (splitURL[0] == "http://htmlpreview.github.com/") {
+        baseURL = splitURL[0] + "?" + splitURL[1];
+        query = splitURL[2];
+    } else {
+        baseURL = splitURL[0];
+        query = splitURL[1];
+    }
+    if (query == null || query == '') {
         locations = DEFAULT_LOCATIONS;
     } else {
-        locations = get_locations(query.substring(1));
+        locations = get_locations(query);
     }
     colorMap = new ColorMap(COLORS);
     stepAngle = STEP / EARTH_RADIUS;
