@@ -1,58 +1,22 @@
-var baseURL;
+// ========================= GLOBAL VARIABLES ================================
+var baseURL; // The base URL of the map.
+var colorMap; // The color map for drawing.
+var map; // The Google Maps map object.
+var markers; // The markers currently on the map.
+var droppedMarker = null; // The marker that is being dropped.
 
-var markers;
-var droppedMarker = null;
+var centralAngle // The current angular distance for the contour.
+var stepAngle; // The angle to step by between contours.
+var maxSideAngle; // The angular resolution for drawing.
 
-var stepAngle;
-var maxSideAngle;
+// Various 3D vector parameters used in calculations.
+var positions; // 3D position vectors for the markers.
+var midpoints; // Circle center (i.e. inside the Earth) for a given marker.
+var coordVecs // Two unit vectors forming co-ordinates on the tangent plane.
 
-var positions, halfAngles, tangents, normals, binormals, coordVecs;
-var midpoints;
-var centralAngle;
+var contourPolys = []; // The list of polygons currently displayed.
 
-var contourPolys = [];
-
-function decode(s) {
-    s = s.replace(/\+/g, " ");
-    return decodeURIComponent(s);
-}
-
-function get_locations(query) {
-    var search = /([^&=]+)=?([^&]*)/g;
-    var match;
-    var locs = {};
-    while (match = search.exec(query)) {
-        var key = decode(match[1]);
-        var value = decode(match[2]);
-        var m2 = /[np]([0-9]+)/.exec(key);
-        if (m2 == null) {
-            continue;
-        }
-        var num = m2[1];
-        if (!(num in locs)) {
-            locs[num] = [null, null];
-        }
-        if (key[0] == 'n') {
-            locs[num][0] = value;
-        } else {
-            var m3 = /([-+]?[0-9]*\.?[0-9]+),([-+]?[0-9]*\.?[0-9]+)/.exec(value);
-            if (m3 == null) {
-                continue;
-            }
-            locs[num][1] = new google.maps.LatLng(parseFloat(m3[1]), parseFloat(m3[2]));
-        }
-    }
-    var locations = [];
-    for (num in locs) {
-        var name = locs[num][0];
-        var pos = locs[num][1];
-        if (name != null && pos != null) {
-            locations.push([name, pos]);
-        }
-    }
-    return locations;
-}
-
+/** Adds an arc from start->end around marker #index.*/
 function addArc(points, index, start, end) {
     var arcAngle = end - start;
     var numSteps = Math.ceil(Math.abs(arcAngle * Math.sin(centralAngle)) / maxSideAngle);
@@ -62,13 +26,7 @@ function addArc(points, index, start, end) {
     }
 }
 
-function markPos(pos) {
-    var marker = new google.maps.Marker({
-        position: VectorToLatLng(pos),
-        map: map,
-    });
-}
-
+/** Calculates a 3D vector for the point given by angle around marker #index */
 function calcPos(index, angle) {
     var center = midpoints[index];
     var v0 = coordVecs[index][0];
@@ -77,78 +35,12 @@ function calcPos(index, angle) {
     return center.add(offset.multiply(Math.sin(centralAngle)));
 }
 
+/** Returns whether the given 3D vector position is inside locale #index */
 function isInside(pos, index) {
     return (positions[index].dot(pos.subtract(midpoints[index])) >= 0);
 }
 
-// Coordinate manipulations
-function findPerpendicularVectors(vector) {
-    var v1, v2;
-    if (vector.e(1) == 0 && vector.e(2) == 0) {
-        v1 = $V([1, 0, 0]);
-        v2 = $V([0, 1, 0]);
-    } else {
-        v1 = $V([-vector.e(2), vector.e(1), 0]);
-        v1 = v1.toUnitVector();
-        v2 = vector.cross(v1);
-    }
-    return [v1, v2];
-}
-
-function VectorToLatLng(myVector) {
-    var elevation = Math.asin(myVector.e(3));
-    var azimuth = Math.atan2(myVector.e(2), myVector.e(1));
-    return new google.maps.LatLng(
-        elevation * 180 / Math.PI,
-        azimuth * 180 / Math.PI
-    ); 
-}
-
-function LatLngToVector(myLatLng) {
-    var elevation = Math.PI * myLatLng.lat() / 180;
-    var azimuth = Math.PI * myLatLng.lng() / 180;
-    var temp = Math.cos(elevation);
-    return $V([
-        temp * Math.cos(azimuth),
-        temp * Math.sin(azimuth),
-        Math.sin(elevation),
-    ]);
-}
-
-// Color functionality.
-function interpolateColors(color1, color2, a) {
-    return [
-        Math.floor(a * color2[0] + (1-a) * color1[0]),
-        Math.floor(a * color2[1] + (1-a) * color1[1]),
-        Math.floor(a * color2[2] + (1-a) * color1[2]),
-    ];
-}
-
-function colorToString(color) {
-    return "rgb(" + color[0] + ", " + color[1] + ", " + color[2] + ")";
-}
-
-function ColorMap(colors) {
-    this.colors = colors;
-    this.multiplier = colors.length - 1;
-}
-
-ColorMap.prototype.getColor = function(value) {
-    var index = this.multiplier * value;
-    var i = Math.min(this.colors.length-2, Math.floor(index));
-    var a = Math.min(1, Math.max(0, index - i));
-    return colorToString(
-        interpolateColors(this.colors[i], this.colors[i+1], a));
-};
-
-function normalizeAngle(angle) {
-    return angle - 2*Math.PI*Math.floor(angle/(2*Math.PI));
-}
-
-// Global variables.
-var colorMap; // The color map for drawing.
-var map; // The map object.
-
+/** Creates a new marker at the given position with the given title */
 function createMarker(position, title) {
     var index = markers.length;
     var marker = new google.maps.Marker({
@@ -184,6 +76,7 @@ function createMarker(position, title) {
     markers.push(marker);
 }
 
+/** Updates the URL with the markers currently being displayed */
 function updateURL() {
     var newURL = baseURL;
     var first = true;
@@ -200,7 +93,27 @@ function updateURL() {
     window.history.pushState({}, "PAX Contour plot", newURL);
 }
 
+/** Starts up the map, and draws the contour plot for the first time. */
 function initialize() {
+    // Basic initializations.
+    colorMap = new ColorMap(COLORS);
+    stepAngle = STEP / EARTH_RADIUS;
+    maxSideAngle = RESOLUTION / EARTH_RADIUS;
+    map = new google.maps.Map(
+        document.getElementById("map_canvas"),
+        MAP_OPTIONS
+    );
+    google.maps.event.addListener(map, 'click', function(event) {
+        var label = prompt("Enter a name for this marker!","PAX");
+        if (label == null) {
+            return;
+        }
+        createMarker(event.latLng, label);
+        redraw();
+        updateURL();
+    });
+
+    // Parse the URL to get starting locations
     var locations;
     var splitURL = window.location.href.split('?');
     var startIndex;
@@ -212,41 +125,26 @@ function initialize() {
         startIndex = 1;
     }
     var query = splitURL.slice(startIndex).join('?');
-    if (query == '') {
-        locations = DEFAULT_LOCATIONS;
-    } else {
-        locations = get_locations(query);
-    }
-    colorMap = new ColorMap(COLORS);
-    stepAngle = STEP / EARTH_RADIUS;
-    maxSideAngle = RESOLUTION / EARTH_RADIUS;
-    // The actual Google Maps map object.
-    map = new google.maps.Map(
-        document.getElementById("map_canvas"),
-        MAP_OPTIONS
-    );
+    locations = (query == '') ? DEFAULT_LOCATIONS : getLocations(query);
+
+    // Create a marker at each location. 
     markers = [];
     for (var i = 0; i < locations.length; i++) {
         createMarker(locations[i][1], locations[i][0]);
     }
-    google.maps.event.addListener(map, 'click', function(event) {
-        var label = prompt("Enter a name for this marker!","PAX");
-        if (label == null) {
-            return;
-        }
-        createMarker(event.latLng, label);
-        redraw();
-        updateURL();
-    });
+
+    // Draw the map.
     drawContours();
     updateURL();
 }
 
+/** Redraws the contours, using the current marker positions. */
 function redraw() {
     clearContours();
     drawContours();
 }
 
+/** Clears the contours from the screen. */
 function clearContours() {
     for (var i = 0; i < contourPolys.length; i++) {
         contourPolys[i].setMap(null);
@@ -254,20 +152,27 @@ function clearContours() {
     contourPolys.length = 0;
 }
 
+/** Draws the contours onto the screen, using current marker positions */
 function drawContours() {
-    // Extra coordinate variables.
-    positions = [];
-    halfAngles = [];
-    tangents = [];
-    normals = [];
-    binormals = [];
-    coordVecs = [];
     if (markers.length == 0) {
         return;
     }
+    // Initialize the coordinate variables.
+    positions = []; midpoints = []; coordVecs = [];
+    // Initialize 2D array variables for calculating intersections.
+    var halfAngles = []; // Half of the angle between two markers.
+    var tangents = []; // Tangent at the halfway point.
+    var normals = []; // Normal vector at the halfway point.
+    var binormals = []; // Binormal vector at the halfway point.
     for (var i = 0; i < markers.length; i++) {
+        halfAngles[i] = [];
+        tangents[i] = [];
+        normals[i] = [];
+        binormals[i] = [];
         positions[i] = LatLngToVector(markers[i].getPosition());
     }
+
+    // Calculate values for the intersections.
     for (var i = 0; i < markers.length; i++) {
         halfAngles[i] = [];
         tangents[i] = [];
@@ -283,6 +188,8 @@ function drawContours() {
             binormals[i][j] = binormals[j][i] = binormal;
         }
     }
+
+    // Calculate local coordinate systems for each tangent plane.
     if (markers.length == 1) {
         coordVecs[0] = findPerpendicularVectors(positions[0]);
     } else {
@@ -294,10 +201,10 @@ function drawContours() {
     }
 
     // Start drawing the contours.
-    var finished = false;
+    var finished = false; // True once the last contour has been drawn.
     var allContours = [];
     for (var count = 0;; count++) {
-        centralAngle = count * stepAngle; // distance for the current contour.
+        centralAngle = count * stepAngle; // Current angular distance.
         if (centralAngle > Math.PI) {
             finished = true;
             break;
@@ -323,12 +230,15 @@ function drawContours() {
                     var a = normals[i][j].multiply(Math.cos(angularDelta));
                     var b = binormals[i][j].multiply(Math.sin(angularDelta));
                     for (var pos = a.add(b), k = 0; k < 2; pos = a.subtract(b), k++) {
+                        // Create a new Intersection.
                         var inter = new Intersection(i, j, pos);
                         for (var index = i, m = 0; m < 2; index = j, m++) {
+                            // Calculate the local angular coordinate.
                             var x = pos.dot(coordVecs[index][0]);
                             var y = pos.dot(coordVecs[index][1]);
                             inter.setAngle(index, Math.atan2(y, x));
                         }
+                        // Store the intersections.
                         allIntersections.push(inter);
                         intersectionsByIndex[i].push(inter);
                         intersectionsByIndex[j].push(inter);
@@ -342,8 +252,10 @@ function drawContours() {
         if (finished) {
             break;
         }
+
+        // Change intersectionsByIndex into a list of pairs, ordered by angle.
         for (var i = 0; i < markers.length; i++) {
-            anglePairs = [];
+            var anglePairs = [];
             for (var j = 0; j < intersectionsByIndex[i].length; j++) {
                 var inter = intersectionsByIndex[i][j];
                 anglePairs.push([inter.getAngle(i), inter]);
@@ -357,7 +269,8 @@ function drawContours() {
             }
         }
 
-        var currentContour = [];
+        var currentContour = []; // Here comes the drawing!
+        // Plot any non-intersecting circles by themselves.
         for (var i = 0; i < markers.length; i++) {
             if (intersectionsByIndex[i].length > 0) {
                 continue;
@@ -366,9 +279,11 @@ function drawContours() {
             addArc(currentPath, i, 0, 2 * Math.PI);
             currentContour.push(currentPath);
         }
+
+        // Plot the intersecting contours now.
         for (var num = 0; num < allIntersections.length; num++) {
             var inter = allIntersections[num];
-            var inside = false;
+            // First make sure it's a valid intersection.
             for (var index = 0; index < markers.length; index++) {
                 if (index == inter.i || index == inter.j) {
                     continue;
@@ -381,49 +296,48 @@ function drawContours() {
             if (inter.isMarked()) {
                 continue;
             }
+
+            // Now plot a path through other intersections.
             var currentPath = [];
-            var index = inter.i;
-            var otherIndex = inter.j;
-            var localIndex = inter.ii;
-            var angle = inter.ai;
-            var prevDelta = 0;
-            while (!inter.isMarked()) {
+            for (var index = inter.i; !inter.isMarked(); ) {
+                // Find which intersection should come next.
                 var inters = intersectionsByIndex[index];
-                var nextIndex;
-                var nextAngle;
+                var nextIndex, nextAngle;
                 for (var delta = -1; delta < 2; delta += 2) {
-                    nextIndex = localIndex + delta;
+                    nextIndex = inter.getIndex(index) + delta;
                     if (nextIndex < 0) {
                         nextIndex = inters.length - 1;
                         nextAngle = inters[nextIndex][0] - 2 * Math.PI;
-                    } else if (nextIndex == intersectionsByIndex[index].length) {
+                    } else if (nextIndex == inters.length) {
                         nextIndex = 0;
                         nextAngle = inters[nextIndex][0] + 2 * Math.PI;
                     } else {
                         nextAngle = inters[nextIndex][0];
                     }
-                    var pos = calcPos(index, (angle + nextAngle) / 2);
-                    if (!isInside(pos, otherIndex)) {
+                    var halfAngle = (inter.getAngle(index) + nextAngle) / 2;
+                    var halfPos = calcPos(index, halfAngle);
+                    if (!isInside(halfPos, inter.getOther(index))) {
                         break;
                     }
                 }
-                addArc(currentPath, index, angle, nextAngle);
+
+                // Plot the arc and switch to that intersection.
+                addArc(currentPath, index, inter.getAngle(index), nextAngle);
                 inter.setMarked(true);
                 inter = inters[nextIndex][1];
-                otherIndex = index;
                 index = inter.getOther(index);
-                localIndex = inter.getIndex(index);
-                angle = inter.getAngle(index);
             }
             currentContour.push(currentPath);
         }
         allContours.push(currentContour);
     }
+
+    // Now actually display the contours on screen.
     for (i = 0; i < count; i++) {
         contourPolys.push(new google.maps.Polygon({
             paths: allContours[i],
             map: map,
-            strokeColor: colorMap.getColor(i / (count - 1)),
+            strokeColor: colorMap.getColor(i * stepAngle / Math.PI),
             strokeOpacity: 0.8,
             strokeWeight: 2,
             fillOpacity: 0,
