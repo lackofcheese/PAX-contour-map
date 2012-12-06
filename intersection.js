@@ -1,3 +1,6 @@
+/** Remembers a new intersection between circles #i and #j,
+ * at the given position. 
+ */
 function Intersection(i, j, position) {
     this.i = i;
     this.j = j;
@@ -5,6 +8,7 @@ function Intersection(i, j, position) {
     this.marked = false;
 }
 
+/** Retrieves the other circle index for this intersection. */
 Intersection.prototype.getOther = function(index) {
     if (index == this.i) {
         return this.j;
@@ -13,6 +17,7 @@ Intersection.prototype.getOther = function(index) {
     }
 }
 
+/** Sets the local angle for the given index. */
 Intersection.prototype.setAngle = function(index, angle) {
     if (index == this.i) {
         this.ai = angle;
@@ -21,6 +26,7 @@ Intersection.prototype.setAngle = function(index, angle) {
     }
 }
 
+/** Gets the local angle for the given index. */
 Intersection.prototype.getAngle = function(index) {
     if (index == this.i) {
         return this.ai;
@@ -29,6 +35,7 @@ Intersection.prototype.getAngle = function(index) {
     }
 }
 
+/** Sets the local index for the given index. */
 Intersection.prototype.setIndex = function(index, localIndex) {
     if (index == this.i) {
         this.ii = localIndex;
@@ -37,6 +44,7 @@ Intersection.prototype.setIndex = function(index, localIndex) {
     }
 }
 
+/** Gets the local index for the given index. */
 Intersection.prototype.getIndex = function(index) {
     if (index == this.i) {
         return this.ii;
@@ -45,10 +53,14 @@ Intersection.prototype.getIndex = function(index) {
     }
 }
 
+/** Sets the marked status of this intersection. */
 Intersection.prototype.setMarked = function(value) {
     this.marked = value;
 }
 
+/** Returns true if this intersection is marked, and false
+ * otherwise.
+ */
 Intersection.prototype.isMarked = function() {
     return this.marked;
 }

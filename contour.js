@@ -19,14 +19,15 @@ var contourPolys = []; // The list of polygons currently displayed.
 /** Adds an arc from start->end around marker #index.*/
 function addArc(points, index, start, end) {
     var arcAngle = end - start;
-    var numSteps = Math.ceil(Math.abs(arcAngle * Math.sin(centralAngle)) / maxSideAngle);
+    var radius = Math.sin(centralAngle);
+    var numSteps = Math.ceil(Math.abs(arcAngle * radius) / maxSideAngle);
     for (var i = 0; i <= numSteps; i++) {
         var angle = (end * i + start * (numSteps-i)) / numSteps;
-        points.push(VectorToLatLng(calcPos(index, angle)));
+        points.push(vectorToLatLng(calcPos(index, angle)));
     }
 }
 
-/** Calculates a 3D vector for the point given by angle around marker #index */
+/** Calculates a 3D vector for the point given by angle around marker #index. */
 function calcPos(index, angle) {
     var center = midpoints[index];
     var v0 = coordVecs[index][0];
@@ -169,7 +170,7 @@ function drawContours() {
         tangents[i] = [];
         normals[i] = [];
         binormals[i] = [];
-        positions[i] = LatLngToVector(markers[i].getPosition());
+        positions[i] = latLngToVector(markers[i].getPosition());
     }
 
     // Calculate values for the intersections.
@@ -179,10 +180,11 @@ function drawContours() {
         normals[i] = [];
         binormals[i] = [];
         for (var j = 0; j < i; j++) {
-            halfAngles[i][j] = halfAngles[j][i] = positions[i].angleFrom(positions[j]) / 2;
+            var halfAngle = positions[i].angleFrom(positions[j]) / 2;
             var normal = positions[i].add(positions[j]).toUnitVector();
             var tangent = positions[i].subtract(positions[j]).toUnitVector();
             var binormal = tangent.cross(normal);
+            halfAngles[i][j] = halfAngles[j][i] = halfAngle;
             normals[i][j] = normals[j][i] = normal;
             tangents[i][j] = tangents[j][i] = tangent;
             binormals[i][j] = binormals[j][i] = binormal;
@@ -226,10 +228,17 @@ function drawContours() {
                     finished = true;
                     break;
                 } else {
-                    var angularDelta = Math.acos(Math.cos(centralAngle) / Math.cos(halfAngles[i][j]));
-                    var a = normals[i][j].multiply(Math.cos(angularDelta));
+                    var deltaCosine = (
+                        Math.cos(centralAngle) / Math.cos(halfAngles[i][j])
+                    );
+                    var angularDelta = Math.acos(deltaCosine);
+                    var a = normals[i][j].multiply(deltaCosine);
                     var b = binormals[i][j].multiply(Math.sin(angularDelta));
-                    for (var pos = a.add(b), k = 0; k < 2; pos = a.subtract(b), k++) {
+                    for (
+                        var pos = a.add(b), k = 0;
+                        k < 2;
+                        pos = a.subtract(b), k++
+                    ) {
                         // Create a new Intersection.
                         var inter = new Intersection(i, j, pos);
                         for (var index = i, m = 0; m < 2; index = j, m++) {

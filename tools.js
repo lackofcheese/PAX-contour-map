@@ -7,12 +7,14 @@ function decode(s) {
 
 /** Retrive the locations from an encoded URL query string */
 function getLocations(query) {
-    var regex = /([^&=]+)=?([^&]*)/g; // Query format.
+    var keyValueRegex = /([^&=]+)=?([^&]*)/g; // Query format.
+    var nameOrPosKeyRegex = /[np]([0-9]+)/;
+    var latLngRegex = /([-+]?[0-9]*\.?[0-9]+),([-+]?[0-9]*\.?[0-9]+)/ ;
     var locs = {}, match; // Temporary results storage.
-    while (match = regex.exec(query)) {
+    while (match = keyValueRegex.exec(query)) {
         var key = decode(match[1]);
         var value = decode(match[2]);
-        var m2 = /[np]([0-9]+)/.exec(key);
+        var m2 = nameOrPosKeyRegex.exec(key);
         if (m2 == null) {
             continue;
         }
@@ -23,11 +25,14 @@ function getLocations(query) {
         if (key[0] == 'n') {
             locs[num][0] = value;
         } else {
-            var m3 = /([-+]?[0-9]*\.?[0-9]+),([-+]?[0-9]*\.?[0-9]+)/.exec(value);
+            var m3 = latLngRegex.exec(value);
             if (m3 == null) {
                 continue;
             }
-            locs[num][1] = new google.maps.LatLng(parseFloat(m3[1]), parseFloat(m3[2]));
+            locs[num][1] = new google.maps.LatLng(
+                parseFloat(m3[1]),
+                parseFloat(m3[2])
+            );
         }
     }
     var locations = [];
@@ -45,7 +50,7 @@ function getLocations(query) {
 /** Create a new google maps marker at the given 3D vector position. */
 function markPos(pos) {
     return new google.maps.Marker({
-        position: VectorToLatLng(pos),
+        position: vectorToLatLng(pos),
         map: map,
     });
 }
@@ -65,7 +70,7 @@ function findPerpendicularVectors(vector) {
 }
 
 /** Converts the given Vector to a google.maps.LatLng. */
-function VectorToLatLng(myVector) {
+function vectorToLatLng(myVector) {
     var elevation = Math.asin(myVector.e(3));
     var azimuth = Math.atan2(myVector.e(2), myVector.e(1));
     return new google.maps.LatLng(
@@ -75,7 +80,7 @@ function VectorToLatLng(myVector) {
 }
 
 /** Converts the given google.maps.LatLng to a Vector. */
-function LatLngToVector(myLatLng) {
+function latLngToVector(myLatLng) {
     var elevation = Math.PI * myLatLng.lat() / 180;
     var azimuth = Math.PI * myLatLng.lng() / 180;
     var temp = Math.cos(elevation);
@@ -87,8 +92,8 @@ function LatLngToVector(myLatLng) {
 }
 //========================= COLOR MANIPULATION ===============================
 /** Returns the color that is a proportion of a from color 1 to color 2; e.g.
- * 0.5 is halfway between, 0.75 is a ratio of 3:1 of color2:color1
- */
+* 0.5 is halfway between, 0.75 is a ratio of 3:1 of color2:color1
+*/
 function interpolateColors(color1, color2, a) {
     return [
         Math.floor(a * color2[0] + (1-a) * color1[0]),
@@ -110,8 +115,8 @@ function ColorMap(colors) {
 }
 
 /** Returns the color associated with the given value (must be between 0
- * and 1)
- */
+* and 1)
+*/
 ColorMap.prototype.getColor = function(value) {
     var index = this.multiplier * value;
     var i = Math.min(this.colors.length-2, Math.floor(index));
