@@ -9,6 +9,61 @@ var centralAngle;
 
 var contourPolys;
 
+function decode(s) {
+    var pl = /\+/g;
+    return decodeURIComponent(s.replace(pl, " "));
+}
+
+function get_locations(query) {
+    var search = /([^&=]+)=?([^&]*)/g;
+    var match;
+    var locs = {};
+    while (match = search.exec(query)) {
+        var m2 = /[np]([0-9]+)/.exec(match[1]);
+        if (m2 == null) {
+            continue;
+        }
+        var num = m2[1];
+        if (!(num in locs)) {
+            locs[num] = [null, null];
+        }
+        if (match[1][0] == 'n') {
+            locs[num][0] = match[2];
+        } else {
+            var m3 = /([-+]?[0-9]*\.?[0-9]+),([-+]?[0-9]*\.?[0-9]+)/.exec(match[2]);
+            if (m3 == null) {
+                continue;
+            }
+            locs[num][1] = new google.maps.LatLng(parseFloat(m3[1]), parseFloat(m3[2]));
+        }
+    }
+    var locations = [];
+    for (num in locs) {
+        var name = locs[num][0];
+        var pos = locs[num][1];
+        if (name != null && pos != null) {
+            locations.push([name, pos]);
+        }
+    }
+    return locations;
+}
+
+function makeURL() {
+    var newURL = window.location.href.split('?', 1)[0];
+    var first = true;
+    for (var i = 0; i < markers.length; i++) {
+        if (first) {
+            newURL += "?";
+            first = false;
+        } else {
+            newURL += "&";
+        }
+        newURL += "n" + i + "=" + markers[i].getTitle();
+        newURL += "&p" + i + "=" + markers[i].getPosition().toUrlValue();
+    }
+    return newURL;
+}
+
 function addArc(points, index, start, end) {
     var arcAngle = end - start;
     var numSteps = Math.ceil(Math.abs(arcAngle * Math.sin(centralAngle)) / maxSideAngle);
@@ -120,6 +175,7 @@ function createMarker(position, title) {
     google.maps.event.addListener(marker, 'dragend', function() {
         stepAngle = STEP / EARTH_RADIUS;
         maxSideAngle = RESOLUTION / EARTH_RADIUS;
+        window.history.pushState({}, "PAX Contour plot", makeURL());
         redraw();
     });
     google.maps.event.addListener(marker, 'position_changed', redraw);
@@ -133,7 +189,15 @@ function createMarker(position, title) {
 
 
 function initialize() {
-    alert(document.URL);
+    var locations;
+
+    query = window.location.search;
+    if (query == '') {
+        locations = DEFAULT_LOCATIONS;
+    } else {
+        locations = get_locations(query.substring(1));
+    }
+
     colorMap = new ColorMap(COLORS);
     stepAngle = STEP / EARTH_RADIUS;
     maxSideAngle = RESOLUTION / EARTH_RADIUS;
@@ -143,11 +207,11 @@ function initialize() {
         MAP_OPTIONS
     );
     markers = [];
-    for (var i = 0; i < LOCATIONS.length; i++) {
-        createMarker(LOCATIONS[i][1], LOCATIONS[i][0]);
+    for (var i = 0; i < locations.length; i++) {
+        createMarker(locations[i][1], locations[i][0]);
     }
     google.maps.event.addListener(map, 'click', function(event) {
-        var label = prompt("Enter a name for this PAX!","PAX");
+        var label = prompt("Enter a name for this marker!","PAX");
         if (label == null) {
             return;
         }
