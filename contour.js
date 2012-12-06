@@ -10,7 +10,7 @@ var positions, halfAngles, tangents, normals, binormals, coordVecs;
 var midpoints;
 var centralAngle;
 
-var contourPolys;
+var contourPolys = [];
 
 function decode(s) {
     var pl = /\+/g;
@@ -49,22 +49,6 @@ function get_locations(query) {
         }
     }
     return locations;
-}
-
-function makeURL() {
-    var newURL = baseURL;
-    var first = true;
-    for (var i = 0; i < markers.length; i++) {
-        if (first) {
-            newURL += "?";
-            first = false;
-        } else {
-            newURL += "&";
-        }
-        newURL += "n" + i + "=" + markers[i].getTitle();
-        newURL += "&p" + i + "=" + markers[i].getPosition().toUrlValue();
-    }
-    return newURL;
 }
 
 function addArc(points, index, start, end) {
@@ -185,7 +169,7 @@ function createMarker(position, title) {
             return;
         }
         redraw();
-        window.history.pushState({}, "PAX Contour plot", makeURL());
+        updateURL();
         droppedMarker = null;
     });
     google.maps.event.addListener(marker, 'position_changed', redraw);
@@ -193,10 +177,26 @@ function createMarker(position, title) {
         markers.splice(markers.indexOf(marker), 1);
         marker.setMap(null);
         redraw();
+        updateURL();
     });
     markers.push(marker);
 }
 
+function updateURL() {
+    var newURL = baseURL;
+    var first = true;
+    for (var i = 0; i < markers.length; i++) {
+        if (first) {
+            newURL += "?";
+            first = false;
+        } else {
+            newURL += "&";
+        }
+        newURL += "n" + i + "=" + markers[i].getTitle();
+        newURL += "&p" + i + "=" + markers[i].getPosition().toUrlValue();
+    }
+    window.history.pushState({}, "PAX Contour plot", newURL);
+}
 
 function initialize() {
     var locations;
@@ -233,11 +233,11 @@ function initialize() {
             return;
         }
         createMarker(event.latLng, label);
-        clearContours();
-        drawContours();
+        redraw();
+        updateURL();
     });
-    contourPolys = [];
     drawContours();
+    updateURL();
 }
 
 function redraw() {
