@@ -190,14 +190,12 @@ function createMarker(position, title) {
 
 function initialize() {
     var locations;
-
     query = window.location.search;
     if (query == '') {
         locations = DEFAULT_LOCATIONS;
     } else {
         locations = get_locations(query.substring(1));
     }
-
     colorMap = new ColorMap(COLORS);
     stepAngle = STEP / EARTH_RADIUS;
     maxSideAngle = RESOLUTION / EARTH_RADIUS;
