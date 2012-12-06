@@ -1,4 +1,5 @@
 var markers;
+var droppedMarker = null;
 
 var stepAngle;
 var maxSideAngle;
@@ -49,7 +50,7 @@ function get_locations(query) {
 }
 
 function makeURL() {
-    var newURL = window.location.href.split('?', 1)[0];
+    var newURL = window.location.href.replace(window.location.search, "");
     var first = true;
     for (var i = 0; i < markers.length; i++) {
         if (first) {
@@ -175,8 +176,15 @@ function createMarker(position, title) {
     google.maps.event.addListener(marker, 'dragend', function() {
         stepAngle = STEP / EARTH_RADIUS;
         maxSideAngle = RESOLUTION / EARTH_RADIUS;
-        window.history.pushState({}, "PAX Contour plot", makeURL());
+        droppedMarker = marker;
+    });
+    google.maps.event.addListener(marker, 'animation_changed', function() {
+        if (marker.getAnimation() != null || droppedMarker != marker) {
+            return;
+        }
         redraw();
+        window.history.pushState({}, "PAX Contour plot", makeURL());
+        droppedMarker = null;
     });
     google.maps.event.addListener(marker, 'position_changed', redraw);
     google.maps.event.addListener(marker, 'rightclick', function() {
