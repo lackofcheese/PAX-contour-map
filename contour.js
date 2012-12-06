@@ -200,16 +200,17 @@ function createMarker(position, title) {
 
 function initialize() {
     var locations;
-    var splitURL = window.location.href.split('?', 2);
-    var query;
+    var splitURL = window.location.href.split('?');
+    var startIndex;
     if (splitURL[0] == "http://htmlpreview.github.com/") {
         baseURL = splitURL[0] + "?" + splitURL[1];
-        query = splitURL[2];
+        startIndex = 2;
     } else {
         baseURL = splitURL[0];
-        query = splitURL[1];
+        startIndex = 1;
     }
-    if (query == null || query == '') {
+    var query = splitURL.slice(startIndex).join('?');
+    if (query == '') {
         locations = DEFAULT_LOCATIONS;
     } else {
         locations = get_locations(query);
