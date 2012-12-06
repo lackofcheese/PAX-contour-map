@@ -13,8 +13,8 @@ var centralAngle;
 var contourPolys = [];
 
 function decode(s) {
-    var pl = /\+/g;
-    return decodeURIComponent(s.replace(pl, " "));
+    s = s.replace(/\+/g, " ");
+    return decodeURIComponent(s);
 }
 
 function get_locations(query) {
@@ -22,7 +22,9 @@ function get_locations(query) {
     var match;
     var locs = {};
     while (match = search.exec(query)) {
-        var m2 = /[np]([0-9]+)/.exec(match[1]);
+        var key = decode(match[1]);
+        var value = decode(match[2]);
+        var m2 = /[np]([0-9]+)/.exec(key);
         if (m2 == null) {
             continue;
         }
@@ -30,10 +32,10 @@ function get_locations(query) {
         if (!(num in locs)) {
             locs[num] = [null, null];
         }
-        if (match[1][0] == 'n') {
-            locs[num][0] = match[2];
+        if (key[0] == 'n') {
+            locs[num][0] = value;
         } else {
-            var m3 = /([-+]?[0-9]*\.?[0-9]+),([-+]?[0-9]*\.?[0-9]+)/.exec(match[2]);
+            var m3 = /([-+]?[0-9]*\.?[0-9]+),([-+]?[0-9]*\.?[0-9]+)/.exec(value);
             if (m3 == null) {
                 continue;
             }
